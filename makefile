@@ -1,7 +1,7 @@
 rc: client
-	./client localhost 21
+	./client localhost
 
-runServer: server
+rs: server
 	sudo ./server
 
 server: server.c
