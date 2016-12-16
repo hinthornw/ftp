@@ -1,0 +1,256 @@
+
+419,061 Members | 1,989 Online
+	
+
+    Join Now login d
+
+Bytes IT Community 	
+Ask Question
+
+Home Questions Articles Browse Topics Latest Top Members FAQ
+home > topics > c / c++ > questions > comprehension problem between getchar() and fgetc().
++ Ask a Question
+Need help? Post your question and get tips & solutions from a community of 419,061 IT Pros & Developers. It's quick & easy.
+Comprehension problem between getchar() and fgetc().
+P: 35
+	
+primeSo
+// FIRST
+Expand|Select|Wrap|Line Numbers
+
+     
+    int main(void){
+    int c, i = 0;
+    char cArray[100];
+     
+    while( (c = getchar()) != '\n' && c != EOF){
+       cArray[i] = c;
+       i ++;
+    }
+    }
+     
+
+// SECOND
+Expand|Select|Wrap|Line Numbers
+
+    void readRestOfLine(){
+     int c;
+     
+       /* Read until the end of the line or end-of-file. */   
+       while ((c = fgetc(stdin)) != '\n' && c != EOF)
+          ;
+     
+     /* Clear the error and end-of-file flags. */
+       clearerr(stdin);
+    }
+     
+
+//THIRD
+Expand|Select|Wrap|Line Numbers
+
+    int main(){
+       int c;
+     
+      c = getchar();
+       readRestOfLine();
+    }
+     
+
+I have problem comprehend the blocks of C code above.
+
+The FIRST , getchar() read every single char from STDIN to the buffer first, then store into cArray through c as long as the condition is true in the while loop. In this case, is the '\n' character being read into the buffer? As i knew, it would right ? but it won't be store inside the cArray due to the false condition. wherever the getchar() is invoke, the program would wait for user to enter input. am i correct ?
+
+While the SECOND, the same while loop with the same testing condition, but using fgetc(), why does the program would execute the while loop smoothly without waiting the user to enter some input ? In my understanding, getchar() is the same as fgetc(), am i correct ? And the function is use to clear the buffer? what buffer is that ? is it the STDIN's buffer ? the function use the fgetc() to read the remaining input in the buffer in a empty while loop, so after the remaining data being read into variable c, what is the next ? Is it the variable and value inside c just "dead" after exiting the function? i am not sure. how does it clear the buffer exactly ?
+
+The THIRD, if i type "a" and press '\n' char, the 'a' would go into buffer and store inside c while the '\n' will still remain in buffer , correct ? that's why it would result some weird output , isn't it ? that's is the usage of SECOND function to clear the remaining input in buffer ?
+
+I am new to this website, i found it would certainly help me. If i make any mistake in term of posting regulation , please correct me. Thanks
+Aug 21 '07 #1
+Post Reply
+Share this Question
+Share on Google+
+9 Replies
+P: 35
+	
+primeSo
+: ( , no one reply me , i need clarification badly on this issue.
+Aug 22 '07 #2
+reply
+gpraghuram
+Expert 100+
+P: 1,275
+	
+gpraghuram
+
+    : ( , no one reply me , i need clarification badly on this issue. 
+
+One good practice to follow wile reading from stdin is, flushing it and then reading it.
+use fflush(stdin);
+This may sole the problem u are facing with the second idea.
+I will spend somre time on this and can add to this.
+
+Raghuram
+Aug 22 '07 #3
+reply
+Expert 10K+
+P: 11,448
+	
+JosAH
+
+    One good practice to follow wile reading from stdin is, flushing it and then reading it.
+    use fflush(stdin); 
+
+That is nonsense: you can't flush an input stream. Flushing is something you do
+on output streams in case they're buffered. The moment you're attempting to
+flush an input stream (if possible), new data may arrive rendering the flushing
+useless.
+
+kind regards,
+
+Jos
+Aug 22 '07 #4
+reply
+Banfa
+Expert Mod 5K+
+P: 8,916
+	
+Banfa
+Actually
+Expand|Select|Wrap|Line Numbers
+
+    fflush(stdin);
+     
+
+invokes undefined behaviour, read this
+Aug 22 '07 #5
+reply
+Banfa
+Expert Mod 5K+
+P: 8,916
+	
+Banfa
+
+    In my understanding, getchar() is the same as fgetc(), am i correct ? And the function is use to clear the buffer? what buffer is that ? is it the STDIN's buffer ? the function use the fgetc() to read the remaining input in the buffer in a empty while loop, so after the remaining data being read into variable c, what is the next ? Is it the variable and value inside c just "dead" after exiting the function? i am not sure. how does it clear the buffer exactly ? 
+
+A lot of you other questions could easily be answered by simply compiling and running the code (especially stepping through it in a debugger).
+
+getchar() always operates on stdin where as fgetc(...) operates on any (readable) FILE stream. getchar() and fgetc(stdin) are equivalent. Yes the function just clears the stdin input buffer, none of the data is returned by the function.
+
+What you need to be aware of is that when getchar() or fgetc(stdin) are called then program stops and waits for user input and it grabs everything the user types until the newline (or EOF) is encountered when it returns to your program and returns the first character in the buffer. This means that when you call getchar() you receive 1 character but there could be a lot of left over data still in the stdin input buffer.
+Aug 22 '07 #6
+reply
+P: 35
+	
+primeSo
+
+    A lot of you other questions could easily be answered by simply compiling and running the code (especially stepping through it in a debugger).
+
+    getchar() always operates on stdin where as fgetc(...) operates on any (readable) FILE stream. getchar() and fgetc(stdin) are equivalent. Yes the function just clears the stdin input buffer, none of the data is returned by the function.
+
+    What you need to be aware of is that when getchar() or fgetc(stdin) are called then program stops and waits for user input and it grabs everything the user types until the newline (or EOF) is encountered when it returns to your program and returns the first character in the buffer. This means that when you call getchar() you receive 1 character but there could be a lot of left over data still in the stdin input buffer. 
+
+yes, i am almost there, thanks but
+I still feel doubt with the fgetc() in the SECOND block of code. According to your statement, that means the program will stop and waiting the user to input data in the while loop. But in fact, it doesn't. Is it because fgetc() automatically read those left over in the buffer ? The key is lie at the empty statement, isn't it ? that means if i simply place the empty while loop statement after the while loop in the FIRST code, it will clear the buffer as well. Last, is the '\n' would be read in from the stdin to the buffer ? or to the cArray ?
+Aug 22 '07 #7
+reply
+Banfa
+Expert Mod 5K+
+P: 8,916
+	
+Banfa
+
+    yes, i am almost there, thanks but
+    I still feel doubt with the fgetc() in the SECOND block of code. According to your statement, that means the program will stop and waiting the user to input data in the while loop. But in fact, it doesn't. 
+
+This is because you have called it in the context of the THIRD block, that is a call to getchar() has already been made which has put data into the input buffer.
+
+Let me clarify the operation of getchar() and fgetc(stdin)
+
+When these functions are called first the check the input buffer, if there is data available in the buffer then they return the next character in the buffer and move the buffer pointer(indicating which is the next character to return) on 1 character. If there is no data in the buffer then the request input from the user (on screen cursor flashes). All of the users data up to the next return character is stored in the input buffer, this can be anywhere between 1 (if the just press return) character to lots of characters.
+
+So if you call getchar() or fgetc(stdin) twice in a row then, unless the user just presses return, the program will not request data for the second call as there will already be data available in the input buffer.
+
+    The key is lie at the empty statement, isn't it ? that means if i simply place the empty while loop statement after the while loop in the FIRST code, it will clear the buffer as well. Last, is the '\n' would be read in from the stdin to the buffer ? or to the cArray ? 
+
+The loop in the FIRST code block already clears the input buffer as it loops copying all data input by the user to your buffer until there is no more data. Putting readRestOfLine after the loop in this code block will have no effect.
+
+On a side note (but an important one) the FIRST code block is quite poor form as it has the very real risk of enabling a buffer overrun (that is the user enters more data than your buffer, cArray, can hold resulting in the data being written into an unallocated memory location following cArray.
+Aug 22 '07 #8
+reply
+gpraghuram
+Expert 100+
+P: 1,275
+	
+gpraghuram
+
+    That is nonsense: you can't flush an input stream. Flushing is something you do
+    on output streams in case they're buffered. The moment you're attempting to
+    flush an input stream (if possible), new data may arrive rendering the flushing
+    useless.
+
+    kind regards,
+
+    Jos 
+
+Thanks for pointing it.
+I have used it couple of times in my coding and i havent faced any issues.
+This is a new learning for me.
+
+Thanks a lot
+Raghuram
+Aug 22 '07 #9
+reply
+P: 35
+	
+primeSo
+
+    This is because you have called it in the context of the THIRD block, that is a call to getchar() has already been made which has put data into the input buffer.
+
+    Let me clarify the operation of getchar() and fgetc(stdin)
+
+    When these functions are called first the check the input buffer, if there is data available in the buffer then they return the next character in the buffer and move the buffer pointer(indicating which is the next character to return) on 1 character. If there is no data in the buffer then the request input from the user (on screen cursor flashes). All of the users data up to the next return character is stored in the input buffer, this can be anywhere between 1 (if the just press return) character to lots of characters.
+
+    So if you call getchar() or fgetc(stdin) twice in a row then, unless the user just presses return, the program will not request data for the second call as there will already be data available in the input buffer.
+
+    The loop in the FIRST code block already clears the input buffer as it loops copying all data input by the user to your buffer until there is no more data. Putting readRestOfLine after the loop in this code block will have no effect.
+
+    On a side note (but an important one) the FIRST code block is quite poor form as it has the very real risk of enabling a buffer overrun (that is the user enters more data than your buffer, cArray, can hold resulting in the data being written into an unallocated memory location following cArray. 
+
+Oh...I see. Thank you. This has clear my doubt.
+
+May you be well and happy~
+prime
+Aug 23 '07 #10
+reply
+Post your reply
+Join Now >>
+
+Sign in to post your reply or Sign up for a free account.
+
+Similar topics
+
+    getchar() problem
+    Learning C - Scanf or Getch, or Getchar not working correctly after first loop.
+    difference between stdio.h and cstdio
+    problem on getchar()...
+    list comprehension
+    Must fread() use fgetc()?
+    what is the difference between getch() & getche()
+    difference between unsigned char and char in c
+    List Comprehension Syntax
+
+Browse more C / C++ Questions on Bytes
+		
+Question stats
+
+    viewed: 4086
+    replies: 9
+    date asked: Aug 21 '07
+
+Follow this discussion
+BYTES.COM © 2016
+Formerly "TheScripts.com" from 2005-2008
+About Bytes | Advertise on Bytes | Contact Us
+Sitemap | C / C++ Answers Sitemap | C / C++ Insights Sitemap
+[Follow us on Google Plus for the Latest Bytes Updates.] [Follow us on Twitter for the latest Bytes updates.] [Follow us on Facebook for the latest Bytes updates.]
+Follow us to get the Latest Bytes Updates
