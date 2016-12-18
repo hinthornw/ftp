@@ -1,9 +1,12 @@
 
 
 INCLUDEC = -I./headers -I./clientFiles
-INCLUDES = -I./headers -I./servFilesl
+INCLUDES = -I./headers -I./servFiles
 CF = ./clientFiles/
-
+FLAGS = -Wall -Wextra
+vpath %.h headers
+vpath %.c clientFiles
+vpath %.c servFiles
 
 rc: client
 	./client localhost
@@ -11,24 +14,25 @@ rc: client
 rs: server
 	sudo ./server
 
-server: server.o sservices.o
-	gcc  -Wall $(INCLUDES) -o server server.o sservices.o
+server: server.o sservices.o sservices.h
+	gcc  $(FLAGS) $(INCLUDES) -o server server.o sservices.o
 server.o: ./servFiles/server.c
-	gcc -Wall $(INCLUDES) -c ./servFiles/server.c
+	gcc $(FLAGS) $(INCLUDES) -c ./servFiles/server.c
 
 sservices.o: ./servFiles/sservices.c
-	gcc -Wall $(INCLUDES)  -c ./servFiles/sservices.c
+	gcc $(FLAGS) $(INCLUDES)  -c ./servFiles/sservices.c
 
-client: client.o cservices.o
-	gcc -Wall $(INCLUDEC)  -o client client.o cservices.o
+client: client.o cservices.o cservices.h
+	gcc $(FLAGS) $(INCLUDEC)  -o client client.o cservices.o
 
 client.o: ./clientFiles/client.c
-	gcc -Wall $(INCLUDEC) -c ./clientFiles/client.c
+	gcc $(FLAGS) $(INCLUDEC) -c ./clientFiles/client.c
 
 cservices.o: ./clientFiles/cservices.c
-	gcc -Wall $(INCLUDEC) -c ./clientFiles/cservices.c
+	gcc $(FLAGS) $(INCLUDEC) -c ./clientFiles/cservices.c
 
 
 
 clean:
 	rm -f server client *.o
+	

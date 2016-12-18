@@ -13,12 +13,15 @@ const int _PORT_L  = 21; // TODO change this..
 
 void servProcess(int, struct sockaddr_in *); /* function prototype */
 
-int main(int argc, char *argv[])
+int main(int argc, char * argv[])
 {
   int controlfd,  clientfd, pid;
   socklen_t clilen;
   struct sockaddr_in serv_ctrl_addr,  cli_addr;
- 
+  if (argc > 1 || argv == NULL){
+    fprintf(stderr, "Usage: sudo ./server\n");
+    return -1;
+  }
   //Set up process to handle zombie children
   if (signal(SIGCHLD,SIG_IGN) == SIG_ERR){ 
     fprintf(stderr, "Cannot set up CHLD signal handler\n");
@@ -156,11 +159,12 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
   fd_set rfds; // File descriptors to be read
   struct timeval tv; // Timer for read value
   int retval, ret; // Return value for the timeval
-  int datafd;
+  //int datafd;
   //struct sockaddr_in serv_data_addr;
   Session sesh;
   Tokens tokens; // string parsing
   size_t numtokens; //parsed in 
+  enum ftpCommands cmd;
 
    /***Assign default variables for this session ***/
   bzero((char *) &sesh, sizeof(sesh));
@@ -210,8 +214,8 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
   while(1)
   {
     #ifdef DEBUG
-    fprintf(stderr,"In loop\n");
-    fflush(stderr);
+    //fprintf(stderr,"In loop\n");
+    //fflush(stderr);
     #endif
      //Initialize the to read FD.
     FD_ZERO(&rfds);
@@ -234,7 +238,6 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
             break;
           }
       case LOGGEDIN:
-        printf("LOOGED IN = %d\n", state);
 
         /**** Wait up to 30 seconds for a message from client ***/
         tv.tv_sec = 30;
@@ -247,7 +250,7 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
         else if (retval) {
             n = recv(sock,buffer,BUFFERSIZE - 1, 0);
             if (n < 0) error("ERROR reading from socket");
-            else if (n == 0) continue;
+            else if (n == 0) break;
             else{
               tokens = strsplit(buffer, ", \t\r\n", &numtokens); // PARSE INPUT
               #ifdef DEBUG
@@ -265,57 +268,86 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
         }
         /*** Message received and parsed. Handle message ***/
         
-        
-        switch(checkMessage(sock, tokens)){
-            case INVALID:
-              break;              
-            case QUIT:
-              #ifdef DEBUG
-              printf("QUIT received. Closing connections.\n");
-              #endif
-              freeTokens(tokens, numtokens);
-              close(sock);
-              close(datafd);
-              exit(0);
-            case PORT:
-              if(changePort(&sesh, tokens) < 0) error("changePort()");
-              else
-                 n = send(sock,"200 Port List Change\r\n",22, MSG_CONFIRM);
-              break;
-            case TYPE:
-              //n = send(sock, "", , MSG_CONFIRM);
-              break;
-            case MODE:
-              // set to stream, block, compressed
-              break;
-            case STRU:
-              //set STR value {file or record}
-              break;
-            case RETR: //Connect data stream to client, xfer from server to client using current parameters
-              datafd = connect_to_client(&sesh);
-              // transferFile(Session, char * filename, int sDataSocket, int control);
-              if(transferFile(&sesh, tokens[1], datafd, sock) < 0) {
-                freeTokens(tokens, numtokens);
-                close(datafd);
-              }
-              break;
-            case STOR://connect data strem to client, xfer from client ot server using current parameters
-              break;
+        cmd = checkMessage(sock, tokens);
+        n = handleMessage(&sesh, cmd, tokens, numtokens, sock);
+        freeTokens(tokens, numtokens);
+        if (n == -1) {
+          fprintf(stderr, "Message didn't work\n");
+          continue;
+        } else if(n == -2){
+          exit(0);
+        } else{
+          continue;
+        }
+        // switch(checkMessage(sock, tokens)){
+        //     case INVALID:
+        //       break;              
+        //     case QUIT:
+        //       #ifdef DEBUG
+        //       printf("QUIT received. Closing connections.\n");
+        //       #endif
+        //       freeTokens(tokens, numtokens);
+        //       close(sock);
+        //       close(datafd);
+        //       exit(0);
+        //     case PORT:
+        //       if(changePort(&sesh, tokens) < 0) error("changePort()");
+        //       else
+        //          n = send(sock,"200 Port List Change\r\n",22, MSG_CONFIRM);
+        //       break;
+        //     case TYPE:
+        //       fprintf(stderr, "TYPE call received\n");
+        //       //n = send(sock, "", , MSG_CONFIRM);
+        //       break;
+        //     case MODE:
+        //       fprintf(stderr, "MODE call received\n");
+        //       // set to stream, block, compressed
+        //       break;
+        //     case STRU:
+        //       n = changeStruc(&sesh, tokens);
+        //       if(n == -1){
+        //         send(sock, "504 Parameter list error\r\n", 26,MSG_CONFIRM);
+        //         break;// hmmm
+        //       }
+        //       else if (n == 1){
+        //         send(sock, "504 Filetype not implemented\r\n", 30,MSG_CONFIRM);
+        //       }
+        //       break;
+        //     case RETR: //Connect data stream to client, xfer from server to client using current parameters
+        //       datafd = connect_to_client(&sesh);
+        //       send(sock, "225 Data connection open\r\n",26 , MSG_CONFIRM);
+        //       // transferFile(Session, char * filename, int sDataSocket, int control);
+        //       if(transferFile(&sesh, tokens[1], datafd, sock) < 0) {
+        //         freeTokens(tokens, numtokens);
+        //         close(datafd);
+        //       }
+        //       break;
+        //     case STOR://connect data strem to client, xfer from client ot server using current parameters
+        //       datafd = connect_to_client(&sesh);
+        //       send(sock, "225 Data connection open\r\n",26 , MSG_CONFIRM);
+        //       // for(unsigned int v = 0; v < numtokens; v++)
+        //       //   fprintf(stderr, "%d: %s\n", v, tokens[v]);
+        //       // transferFile(Session, char * filename, int sDataSocket, int control);
+        //       if(storeFile(&sesh, tokens[1], datafd, sock) <= 0) {
+        //         freeTokens(tokens, numtokens);
+        //         close(datafd);
+        //       }
+        //       break;
 
-            case NOOP:
-              n = send(sock,"220 Service ready\r\n",19, MSG_CONFIRM);
-              if (n < 0){
-                error("send()");
-              }   
-              break;           
-            default:
-              #ifdef DEBUG
-              fprintf(stderr,"Default Command case reached. Check\n");
-              fflush(stderr);
-              #endif
-              break;
-        };
-        break;
+        //     case NOOP:
+        //       n = send(sock,"220 Service ready\r\n",19, MSG_CONFIRM);
+        //       if (n < 0){
+        //         error("send()");
+        //       }   
+        //       break;           
+        //     default:
+        //       #ifdef DEBUG
+        //       fprintf(stderr,"Default Command case reached. Check\n");
+        //       fflush(stderr);
+        //       #endif
+        //       break;
+        // };
+        // break;
        
 
         default:
@@ -323,6 +355,7 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
           fprintf(stderr,"Default state reached (%d). Check\n", state);
           fflush(stderr);
           #endif
+          freeTokens(tokens, numtokens);
           continue;
         
 
