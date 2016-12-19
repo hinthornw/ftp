@@ -22,77 +22,108 @@
 //   #define h_addr  h_addr_list[0]  /* address, for backward compatiblity */
 // };
 
-typedef enum {mSTREAM} mode;
-typedef enum {sFILE, sRECORD} structure;
-typedef enum {cASCII} codeType;
-typedef struct ftpState{
-    char * user;
-    char * pw;
-    mode m;
-    structure s;
-    codeType cT;
-} ftpState;
 
 
 int main(int argc, char *argv[])
 {
     int sockfd, /*portno,*/ i;
-    enum State state = NOTARGET;
+    enum cmdType cmd = INVALID;
     fd_set rfds; // File descriptors to be read
-    int ret; // return value for login
-    const int BUFFER_SIZE = 256;
-    struct sockaddr_in serv_addr;
-    struct hostent server;
+    int ret, datafd = -1; // return value for login
+    size_t BUFFER_SIZE = 256;
     char buffer[BUFFER_SIZE];
+    Tokens tokens;
+    size_t numTokens;
     bzero(buffer, sizeof(buffer));
+    Session sesh;
+    int _PORT_L = 21;
+ 
+    /** partially initialize **/
+    bzero((char *) &sesh, sizeof(sesh));
+    sesh.serv_data_portno = _PORT_L - 1;
+    sesh.mode = STREAM;
+    sesh.type = ASCIINP;
+    sesh.structure = sFILE;
+    sesh.childpid = -1;
+    sesh.controlfd = -1;
+    sesh.datafd = -1;
+    sesh.state = NOTARGET;
 
-    //Check type of command: could be:
-        //a) Open wiftp - (interact from there)
-        //b) Connect to [HOST]
-        //c) Connect to [HOST], data on port [PORT]
-        //d) Error
-    if (argc > 3) { // ERROR
-       fprintf(stderr,"usage: %s [host] [PORT]\n", argv[0]);
-       exit(0);
-    } else if(argc == 3){ // C
-        printf("Connecting to %s. Request data connect on port %d\n", argv[1], atoi(argv[2]));
-        //TODO create a connect_to_host including a port request (i.e. bind instead of connect straight)
-    }
-    else if (argc == 2){     // B
+    
+    if (argc >= 3) { // ERROR
+       fprintf(stderr,"usage: %s [host]\n", argv[0]);
+   } else if (argc == 2){     // B
         printf("Connecting to %s\n", argv[1]);
-        sockfd = connect_to_host(argv[1], &serv_addr, &server, &rfds);
-        if(sockfd < 0) error("Exiting.");
+        sockfd = connect_to_host(argv[1], &sesh, &rfds);
+        if(sockfd == -2) error("Exiting.");
+        else if (sockfd == -1){
+            sockfd = connect_to_host(argv[1], &sesh, &rfds); // Try twice
+            if (sockfd < 0) error("connect()");
+        }
         else
-            state = NOTREADY;
-    } else{ // A TODO
-        printf("%d args\n", argc);
-    }
+            sesh.state = NEEDUSER;
+    } 
    
    
 
     i = 0;
-    while(i < 20){
-        if(state == NEEDUSER){
-            ret =  login(sockfd, /*buffer,*/ &rfds, &state);
-            if(ret){error("LOGIN FAILED");}
-        } else if(state == NOTREADY) // Awaiting 220 Service Ready from server
-        {
-            ret = waitForMessage(sockfd, buffer, BUFFER_SIZE, &rfds);
-            if(strncmp(buffer, "220", 3) == 0){
-                state = NEEDUSER;
-            }
-            else{
-                error("System not ready, blocking.\n");
-            }
-        } else if (state == NOTARGET){
-            printf("ftp> TODO: STUFF - State NOTARGET not finished");
-            //getline();
+    //In general, handlers will reply -1 for temp failure, -2 for closing..
+    while(i++ < 30){
+        bzero(buffer, BUFFER_SIZE);
+        switch(sesh.state){
+            case NEEDUSER:
+                ret =  login(sockfd, &sesh, &rfds);
+                if(ret){
+                    fprintf(stderr, "LOGIN FAILED. Disconnecting\n");
+                    sesh.state = NOTARGET;
+                    sesh.controlfd = -1;
+                    close(sockfd);
+                }
+                break;
+            case LOGGEDIN:
+                printf("ftp$ ");
+                fflush(stdout);
+                cmd = getCommand(buffer, BUFFER_SIZE, &tokens, &numTokens);
+                if(cmd == INVALID){ // Wait for command from stdin, parse into tokens, return 
+                    fprintf(stderr, "Invalid command\n");
+                    //Help() usage stuff
+                    freeTokens(tokens, numTokens);
+                    break;
+                }
+
+                datafd = handleCommand(cmd, &sesh, tokens, &numTokens) == -1;
+                if(datafd == -1){
+                    fprintf(stderr, "Error");
+                }
+                freeTokens(tokens, numTokens);
+                break;
+            case NOTARGET: // ftp with no connection i.e. DISCONNECTED
+                printf("NTftp$ ");
+                fflush(stdout);
+                if((cmd = getCommand(buffer, BUFFER_SIZE, &tokens, &numTokens)) == INVALID){ // Wait for command from stdin, parse into tokens, return 
+                    fprintf(stderr, "Invalid command\n");
+                    //Help() usage stuff
+                    freeTokens(tokens, numTokens);
+                    break;
+                }
+                else if (cmd != HELP){
+                    freeTokens(tokens, numTokens);
+                    printf("No connection. To connect, type open [host]\n");
+                }else{
+                    freeTokens(tokens, numTokens);
+                    printf("HELP\n");
+                }
+                break;
+            case WAIT: //could be transmitting?
+                printf("Action in progress.\n");
+                // waitforinput()
+                break;
+
+            default:
+                fprintf(stderr, "Default case reached..\n");
+                printf("ftp$");
+                fflush(stdout);
         }
-        // printf("ftp$ ");
-
-        //ret = waitForMessage(sockfd, buffer, &rfds);
-
-       
     }
     close(sockfd);
     return 0;

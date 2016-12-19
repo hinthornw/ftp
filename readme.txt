@@ -106,15 +106,10 @@ general flow when connected:
 
 
 TODO: 
-1) Isolate data connection function
-2) Implement download and upload functions
-3) allow for transferral of names
-    -> Reread the ftp protocol for this
-    i.e. RETR "filename"
-          Send the request
-          receive a 150 File status OK
-          Open the file for writing
-              -Meanwhile the server opens for reading
-          transfer
 
-      This way the name is already on both sides
+Case 1) FTP:
+- print ftp$
+- Wait for input from stdin
+
+Case 2) FTP [host]
+- Connect to host

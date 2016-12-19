@@ -176,34 +176,7 @@ void servProcess (int sock, struct sockaddr_in * client_addr)
   sesh.c_control.sin_addr =  client_addr->sin_addr;
   sesh.c_data =  *client_addr;
   sesh.c_data.sin_addr = client_addr->sin_addr;
-  // #ifdef DEBUG
-  // printf("LIST OF ADDRESSES\n%p\n%p\n%p\n", &(client_addr->sin_addr.s_addr), &sesh.c_control.sin_addr.s_addr, &sesh.c_data.sin_addr.s_addr);
-  // printf("LIST OF VLUES\n%u\n%u\n%u\n", client_addr->sin_addr.s_addr, sesh.c_control.sin_addr.s_addr, sesh.c_data.sin_addr.s_addr);
-  // #endif
-
-  // sesh.c_control->sin_family = AF_INET;
-
-  //   bcopy((char *)client_addr->sin_addr.s_addr, 
-  //        (char *)&(sesh.c_control->sin_addr.s_addr),
-  //        sizeof(uint32_t));
-  //   bcopy((char *)client_addr->)
-  //   serv_addr->sin_port = htons(_PORT_L);
-
-  /***              End Assign                             ***/
-
-  // /***  Create a data socket (already have control socket) ***/
-  // datafd = socket(AF_INET, SOCK_STREAM, 0);
-  // if (datafd < 0){
-  //   error("Data Socket");
-  // }
-  // bzero((char *) &serv_data_addr, sizeof(serv_data_addr));
-  // serv_data_addr.sin_family = AF_INET;
-  // serv_data_addr.sin_addr.s_addr = INADDR_ANY;
-  // serv_data_addr.sin_port = htons(_PORT_L - 1);
-  // if (bind(datafd, (struct sockaddr *) &serv_data_addr,
-  //         sizeof(serv_data_addr)) < 0) 
-  //         error("ERROR on binding, must have authorized access.");
-  /*** Wait, what...                                      ***/
+  
   #ifdef DEBUG
   printf("In dataConnect.\n");
   #endif

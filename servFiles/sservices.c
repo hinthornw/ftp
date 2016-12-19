@@ -35,10 +35,15 @@ char * toUpperCase(char * in){
 
   return copy;
 }
+
 // Change the working directory
 int cd(char * c){
   int r = chdir(c);
-  if(r < 0) perror("chdir()");
+  if(r < 0){
+    fprintf(stderr, "%s:", c);
+    fflush(stderr);
+   perror("chdir()");
+ }
   return r;
 }
 
@@ -118,35 +123,41 @@ int changePort(Session * sesh, Tokens tok)
   return 0;
 }
 
-int asciinpWrite(Session * sesh, char * buffer,const int BUFFER_SIZE, FILE * fp){
-  int c, /*d,*/ i = 0, j = 0; 
-  if(sesh->structure == sREC){ // if rec, must indicate EOF explicitly
-        fprintf(stderr, "File transferred is record type. Will have errors.\n");
-  }
+int removeCharReturns(char * b, int size, int * overlap){
+  int i = 0,  j = 0, k;
+  int n = size;
+  //printf("%d bytes before:\n(%s)\n", size, b);
+  fflush(stdout);
+  if(*overlap == 1 && b[0] != '\n'){
+    printf("OVERLAP! WEIRD\n");
+    for(int v = size; v > 0; v--){
+      b[v] = b[v - 1];
+    }
+    b[0] = '\r';
+    n++;
+  } 
+  *overlap = 0;
 
-  for(i = 0; i < BUFFER_SIZE; i++){
-    c = buffer[i];
-    if(c == '\r'){
-      if(i < BUFFER_SIZE -1){
-        if(buffer[i+1] == '\n'){
-          c = '\n';
-          i++;
-        } 
-      }else{
-        fprintf(stderr, "Carriage return at end of buffer.\n");
-        //return j;
+  for (; i < n && j < n; i++){
+      if(j < (size - 1) && b[j] == '\r' && b[j+1] == '\n'){
+        j++;
+      } else if(j == n -1 && b[j] == '\r'){
+        printf("There is overlap\n");
+        fflush(stdout);
+        *overlap = 1;
+        break;
       }
-    } /*else if (i == 0 && c == '\n'){ // if first char in buffer is \n, preceding char COULD be \r
-      d = fgetc(fp);
-      if (d != '\r')
-        fputc(d, fp);
-    }*/
-    j++;
-    fputc(c, fp);
+      b[i] = b[j];
+      j++;
   }
-
-  return j;
+  for(k = i; k < n; k++){
+    b[k] = '\0';
+  }
+  //printf("%d bytes after:\n(%s)\n", i, b);
+  fflush(stdout);
+  return i;
 }
+
 int asciinpRead(Session * sesh, char * buffer, const int BUFFER_SIZE, FILE * stream){
   int c;  
   int i = 0;
@@ -176,18 +187,6 @@ int asciinpRead(Session * sesh, char * buffer, const int BUFFER_SIZE, FILE * str
 
 int storeFile(Session * sesh, char * filename, int * sDataSocket, int control)
 {
-
-  //Open file name with write access
-  //continue to insert data until is done.
-  //convert /r/n to /n
-  //Yeah....
-  // STOR
-  //     125, 150
-  //        (110)
-  //        226, 250
-  //        425, 426, 451, 551, 552
-  //     532, 450, 452, 553
-  //     500, 501, 421, 530
     int  maxfd;
     int ctrlReturn;
     enum ftpCommands cmd;
@@ -238,6 +237,7 @@ int storeFile(Session * sesh, char * filename, int * sDataSocket, int control)
     }
     int i = 0;
     fprintf(stderr, "Waiting for data.\n");
+    int overlap = 0;
     while(i++ < 1000000)
     {
       
@@ -254,10 +254,10 @@ int storeFile(Session * sesh, char * filename, int * sDataSocket, int control)
       retval = select(maxfd, &rfds, NULL, NULL, &tv);
       if(retval < 0){fclose(fp); perror("select()"); return -1;}
       else if (retval) {
-          fprintf(stderr, "\nSelect() triggered\n");
+          //fprintf(stderr, "\nSelect() triggered\n");
           if(FD_ISSET(*sDataSocket, &rfds))
          { 
-            fprintf(stderr, "Data found \n");
+            //fprintf(stderr, "Data found \n");
             rt = recv(*sDataSocket,buffer, BUFFER_SIZE, 0);
             //fprintf(stderr, "Data: (%s)\n", buffer);
             if (rt < 0) perror("ERROR reading from socket");
@@ -294,7 +294,9 @@ int storeFile(Session * sesh, char * filename, int * sDataSocket, int control)
 
       /***   HMMM How to input  ***/
       if(sesh->type == ASCIINP){
-        n = asciinpWrite(sesh, buffer, BUFFER_SIZE, fp); //Modify to write
+        n = removeCharReturns(buffer, rt, &overlap);
+        fwrite(buffer, 1, n, fp);
+        //n = asciinpWrite(sesh, buffer, BUFFER_SIZE, fp); //Modify to write
       } else if (sesh->type == BINARY){
         n = fread(buffer, 1, BUFFER_SIZE, fp); // Modify to write
       } else{
@@ -307,6 +309,9 @@ int storeFile(Session * sesh, char * filename, int * sDataSocket, int control)
         printf("EOF reached after %d transfers. CLosing stream.\n", i);
         #endif
         send(control, "226 CLosing data conneciton. File transfer completed\r\n", 54, MSG_CONFIRM);
+        if(overlap){
+          fwrite("\r", 1, 1, fp);
+        }
         fclose(fp);
         close(*sDataSocket);
         return 0;
@@ -771,10 +776,10 @@ enum ftpCommands checkMessage(int sock, Tokens buffer){
     if(n < 0) perror("Send err failed");
     return INVALID;
   }else if(strncmp(buffer[0], "PWD", 3) == 0){
-    sprintf(notImplemented, "502 %s  not implemented\r\n", "PWD");
-    n = send(sock,notImplemented,sizeof(notImplemented), MSG_CONFIRM);
-    if(n < 0) perror("Send err failed");
-    return INVALID;
+    //sprintf(notImplemented, "502 %s  not implemented\r\n", "PWD");
+    //n = send(sock,notImplemented,sizeof(notImplemented), MSG_CONFIRM);
+    //if(n < 0) perror("Send err failed");
+    return PWD;
   }else if(strncmp(buffer[0], "CWD", 3) == 0){
     //sprintf(notImplemented, "502 %s  not implemented\r\n", "CWD");
     //n = send(sock,notImplemented,sizeof(notImplemented), MSG_CONFIRM);
@@ -851,10 +856,24 @@ int handleMessage(Session * sesh, enum ftpCommands in, Tokens tokens, size_t num
   int datafd;
   int n;
   char * pathname;
+  int BUFFER_SIZE = 150;
+  char buffer[BUFFER_SIZE];
+  char buffer2[BUFFER_SIZE + 10];
   switch(in)
   {
     case INVALID:
-      return -1;              
+      return -1; 
+    case PWD:
+      pathname = getcwd(buffer, BUFFER_SIZE);
+      if(pathname == NULL){
+        send(sock, "450 Invalid Pathname\r\n", 22, MSG_CONFIRM);
+      } else{
+        sprintf(buffer2, "257 %s \r\n", buffer);
+        send(sock, buffer2, strlen(buffer2), MSG_CONFIRM);
+      }
+      return 0;
+
+
     case QUIT:
       #ifdef DEBUG
       printf("QUIT received. Closing connections.\n");
